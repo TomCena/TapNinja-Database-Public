@@ -1,7 +1,15 @@
 ## YOU NEED 
-### -MATPLOTLIB FOR GRAPHS TO WORK 
-### -PYTHON 3.6 OR NEWER
-### -macOS/LUNUX NEED TKINTER
+-MATPLOTLIB FOR GRAPHS TO WORK
+
+-PYTHON 3.6 OR NEWER
+
+-macOS/LUNUX NEED TKINTER
+
+### HOW TO GET:
+1. Install the latest version of python from [python.org](https://www.python.org/)
+2. Install Matplot lib by pasting this is a Terminal/Command Prompt: python -m pip install matplotlib
+3. For macOS/Linux install Tkinter (no idea what to do here, I don't use either of those OSes
+
 
 
 
