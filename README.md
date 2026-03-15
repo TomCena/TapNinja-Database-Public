@@ -11,6 +11,74 @@
 3. For macOS/Linux install Tkinter (no idea what to do here, I don't use either of those OSes
 
 
+## 🛠️ Tutorial: How to Export Tap Ninja Site Data to the Tracking App
+
+If you've been using the [Tap Ninja Calculator Website](https://a11v1r15.github.io/Tap_Ninja_Calc/) and want to move your progress into this App, follow these steps.
+
+### Step 1: Extract Your Data from the Website
+Because the website saves your data locally in your browser, you need to pull it out using your browser's Developer Tools.
+
+1. Open the **Tap Ninja Calculator website**.
+2. Press **F12** (or `Ctrl + Shift + I` / `Cmd + Option + I` on Mac) to open the Developer Tools.
+3. Click on the **Console** tab at the top of the Developer Tools window.
+4. Paste the following exact command into the console and press **Enter**:
+   ```javascript
+   JSON.stringify(localStorage)
+   ```
+5. A large block of text will appear (it looks like `{"HeroLevel":"85", ...}`). Right-click this text and select **Copy string contents** (or highlight it all and copy it).
+
+---
+
+### Step 2: Convert the Data (Choose Option A or Option B)
+The tracking app requires a specific CSV format to read your data correctly. You can either use an AI to convert it quickly, or run the local Python script included in this repository.
+
+#### Option A: Use an AI Prompt (No coding required)
+Copy the prompt below, paste it into an AI (like Gemini or ChatGPT), and replace the `[INSERT COPIED DATA HERE]` part with the text you copied in Step 1.
+
+**Copy this prompt:**
+```text
+Act as a data parser. I am going to give you a JSON string representing my Tap Ninja save data. I need you to convert it into a specific CSV format.
+
+CSV Format Requirements:
+* Header row: Type,Name/Key,Val1,Val2,Val3,Val4,Val5
+* Heroes: HERO,[Hero Name],[Stars],[Level],-,-,Legendary (Look for keys ending in "Level" and "Stars". E.g., "ElyannaLevel":"85" -> Level 85. If a hero is missing Stars or Level, use "-").
+* Pets: PET,[Pet Name],[Stars],[Bond],-,-, (Look for keys ending in "Bond" and "Stars").
+* Equipment: EQUIPMENT,[Equipment Name],[Level],,,, (Look for keys ending in "Bonus". Match the bonus value to its index/level based on the lists below).
+
+Special Naming Rules:
+* If a pet is named Mouse or Capybara, output Mouse/Capybara.
+* Chicken or Duck -> Chicken/Duck
+* Dragonling or LuckDragon -> Dragonling/Luckdragon
+* Parrot or Peafowl -> Parrot/Peafowl
+* Dog or Wolf -> Dog/Wolf
+
+Equipment Bonus-to-Level Mapping (Index 0 is Level 0, Index 1 is Level 1, etc.):
+* Kimono: 0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625
+* Katana: 0, 7.5, 15, 22.5, 30, 37.5, 45, 52.5, 60, 67.5, 75, 82.5, 90, 97.5, 105, 112.5, 120, 127.5, 135, 142.5, 150, 157.5, 165, 172.5, 180, 187.5
+* Kabuto: 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50, 52.5, 55, 57.5, 60, 62.5
+* Geta: 0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345, 360, 375
+* Kote: 0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2, 3.6, 4, 4.4, 4.8, 5.2, 5.6, 6, 6.4, 6.8, 7.2, 7.6, 8, 8.4, 8.8, 9.2, 9.6, 10
+* Yubiwa: 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100
+* Menpo: 0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2, 3.6, 4, 4.4, 4.8, 5.2, 5.6, 6, 6.4, 6.8, 7.2, 7.6, 8, 8.4, 8.8, 9.2, 9.6, 10
+
+Please output ONLY the raw CSV text inside a code block so I can copy it easily. Here is my JSON data:
+
+[INSERT COPIED DATA HERE]
+```
+Once the AI generates your CSV code, copy it, open Notepad (or any basic text editor), paste the code, and save the file as `TapNinjaData.csv`. *(Make sure it saves as a `.csv` file and not a `.txt` file!)*
+
+#### Option B: Use the Python Script (Local conversion)
+If you prefer running a local script, use the `Save Converter.py` file included in this repository.
+1. Save the JSON string you copied in Step 1 into a text file named `save.json` in the exact same folder as `Save Converter.py`.
+2. Run `Save Converter.py` (double-click it or run it from your terminal/command prompt).
+3. The script will automatically generate a `TapNinjaData.csv` file for you in that same folder.
+
+---
+
+### Step 3: Import into the App
+1. Open the App.
+2. Navigate to the **Settings** tab and click **Import Data from CSV**. 
+3. Select the `TapNinjaData.csv` file you just generated, and your data will instantly populate across all tabs!
 
 
 # INFORMATION
