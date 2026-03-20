@@ -86,7 +86,7 @@ If you prefer running a local script, use the `Save Converter.py` file included 
 ## General Disclamer
 *AI was used to help code this as I don't have enough coding knowledge, especially with databases.*
 Base code was written by me but optimized with AI so it'll run on anything less than a NASA PC.
-I have no idea if this will even work on PCs other than mine because quite frankly the saving mechanism is a mystery to me, sometimes it doesn't create a datenbank.db file but it still saves all the info you input.
+This Information tab tells you most if not all important information about what this program does.
 This was made by **@i.eatchildren** on discord if you find any issues or want something added, please DM me.
 
 ---
@@ -173,6 +173,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
 
 #### Subtab: Levels
 * View current upgrade costs and the total resources needed to max out each building.
+* Includes summaries for **Total Resources Spent** and **Total Resources Needed** across all buildings.
 * `Max All`: Sets all other buildings to your current Castle level.
 * **Rule**: No building can be a higher level than your Castle.
 
@@ -203,6 +204,15 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
     * Shows the current Boost %, the Amber cost for the next level, and the total Amber needed to max out.
     * Use the `+` and `-` buttons to easily adjust levels.
     * `Max All`: Instantly sets all equipment to the maximum level.
+
+### [Seasonal]
+* **Purpose**: Track your resource gains and progress across different game seasons.
+* **Features**:
+    * Track stats like Gold, Elixir, Buildings, Research, Coins, Eggs, Scrolls, Towns Conquered, Amber, Dust, and Feathers.
+    * `Create New Season`: Adds a new column to track data for the next season.
+    * `Edit Season`: Opens a bulk-edit interface to quickly input or update all resource values for the selected season.
+    * `Clear Season`: Wipes all data for the currently selected season.
+    * `Import/Export CSV`: Save or load your seasonal data independently.
 
 ### [Notepad]
 * **Purpose**: A simple space for notes.
