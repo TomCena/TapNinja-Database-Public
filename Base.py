@@ -1,3 +1,4 @@
+# Gemini was here
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -78,7 +79,7 @@ class DatenVerwaltungApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Data Management System")
-        self.root.geometry("1600x1000")
+        self.root.geometry("1800x1100")
         
         # --- Graceful DB Shutdown ---
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -260,6 +261,26 @@ class DatenVerwaltungApp:
             c.execute("SELECT value FROM settings WHERE key='const_ore'")
             res = c.fetchone()
             if res: self.const_ore_var.set(res[0])
+            
+            self.dust_blue_var = tk.StringVar(value="0")
+            self.dust_green_var = tk.StringVar(value="0")
+            self.dust_yellow_var = tk.StringVar(value="0")
+            self.dust_red_var = tk.StringVar(value="0")
+            
+            for color in ['blue', 'green', 'yellow', 'red']:
+                c.execute("SELECT value FROM settings WHERE key=?", (f"dust_{color}",))
+                res = c.fetchone()
+                if res: getattr(self, f"dust_{color}_var").set(res[0])
+
+            self.feathers_blue_var = tk.StringVar(value="0")
+            self.feathers_green_var = tk.StringVar(value="0")
+            self.feathers_yellow_var = tk.StringVar(value="0")
+            self.feathers_red_var = tk.StringVar(value="0")
+            
+            for color in ['blue', 'green', 'yellow', 'red']:
+                c.execute("SELECT value FROM settings WHERE key=?", (f"feathers_{color}",))
+                res = c.fetchone()
+                if res: getattr(self, f"feathers_{color}_var").set(res[0])
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True)
@@ -273,6 +294,7 @@ class DatenVerwaltungApp:
         self.tab_buildings = tk.Frame(self.notebook, bg=self.bg_color)
         self.tab_elixir = tk.Frame(self.notebook, bg=self.bg_color)
         self.tab_equipment = tk.Frame(self.notebook, bg=self.bg_color)
+        self.tab_seasonal = tk.Frame(self.notebook, bg=self.bg_color)
         self.tab_notepad = tk.Frame(self.notebook, bg=self.bg_color)
         self.tab_rules = tk.Frame(self.notebook, bg=self.bg_color)
         self.tab_settings = tk.Frame(self.notebook, bg=self.bg_color)
@@ -285,8 +307,41 @@ class DatenVerwaltungApp:
         self.notebook.add(self.tab_buildings, text="Conquest")
         self.notebook.add(self.tab_elixir, text="Elixir")
         self.notebook.add(self.tab_equipment, text="Equipment")
+        self.notebook.add(self.tab_seasonal, text="Seasonal")
+
+        # --- Seasonal Tab UI ---
+        self.seasonal_resources = sorted(["Gold", "Elixir", "Buildings", "Research", "Coins", "Eggs", "Rare Scrolls", "Epic Scrolls", "Towns Conquered", "Amber", "Dust", "Feathers"])
+        self.seasonal_entry_widgets = {}
+
+        # --- Main controls ---
+        self.seasonal_controls_frame = tk.LabelFrame(self.tab_seasonal, text="Controls", bg=self.bg_color, fg=self.fg_color, padx=10, pady=10)
+        self.seasonal_controls_frame.pack(fill="x", padx=10, pady=5)
+
+        tk.Label(self.seasonal_controls_frame, text="Season:", bg=self.bg_color, fg=self.fg_color).pack(side="left", padx=(0, 5))
+        self.seasonal_season_var = tk.StringVar()
+        self.cmb_seasonal_season = ttk.Combobox(self.seasonal_controls_frame, textvariable=self.seasonal_season_var, state="readonly", width=10)
+        self.cmb_seasonal_season.pack(side="left", padx=5)
+
+        tk.Button(self.seasonal_controls_frame, text="Create New Season", command=self.create_new_season, bg=self.accent_green, fg="white", relief="flat").pack(side="left", padx=5)
+        tk.Button(self.seasonal_controls_frame, text="Edit Season", command=self._create_seasonal_edit_ui, bg=self.btn_bg, fg=self.fg_color, relief="flat").pack(side="left", padx=5)
+        tk.Button(self.seasonal_controls_frame, text="Clear Season", command=self.clear_season_data, bg=self.accent_red, fg="white", relief="flat").pack(side="left", padx=5)
+        tk.Button(self.seasonal_controls_frame, text="Import CSV", command=self.import_seasonal_csv, bg=self.accent_yellow, fg="black", relief="flat").pack(side="left", padx=5)
+        tk.Button(self.seasonal_controls_frame, text="Export CSV", command=self.export_seasonal_csv, bg=self.accent_yellow, fg="black", relief="flat").pack(side="left", padx=5)
+
+        self.seasonal_status_label = tk.Label(self.tab_seasonal, text="", bg=self.bg_color, fg=self.fg_color)
+        self.seasonal_status_label.pack(pady=2, fill="x", padx=10)
+        
+        # --- Frame for dynamic bulk entry ---
+        self.seasonal_bulk_edit_frame = tk.Frame(self.tab_seasonal, bg=self.bg_color)
+        self.seasonal_bulk_edit_frame.pack(fill="x", padx=10, pady=5)
+
+        # --- Treeview for displaying data ---
+        self.tree_seasonal = ttk.Treeview(self.tab_seasonal, show="headings")
+        self.tree_seasonal.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        self._update_season_selector()
         self.notebook.add(self.tab_notepad, text="Notepad")
-        self.notebook.add(self.tab_rules, text="Rules")
+        self.notebook.add(self.tab_rules, text="Info")
         self.notebook.add(self.tab_settings, text="Settings")
 
         # --- Progress Tab UI ---
@@ -393,7 +448,7 @@ class DatenVerwaltungApp:
         f_pet = tk.LabelFrame(stats_frame, text="Pets Stats", bg=self.bg_color, fg=self.fg_color)
         f_pet.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         
-        pet_labels = ["Obtained", "Total Stars", "Total Bond", "Feathers Used", "Feathers Needed", "Time Spent"]
+        pet_labels = ["Obtained", "Total Stars", "Total Bond", "Feathers Used", "Feathers Needed", "Time Spent", "Time Needed"]
         for i, l in enumerate(pet_labels):
             tk.Label(f_pet, text=l+":", bg=self.bg_color, fg=self.fg_color).grid(row=i, column=0, sticky="w", padx=5, pady=2)
             v = tk.StringVar(value="-")
@@ -403,7 +458,7 @@ class DatenVerwaltungApp:
         f_build = tk.LabelFrame(stats_frame, text="Buildings Stats", bg=self.bg_color, fg=self.fg_color)
         f_build.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         
-        build_labels = ["Total Levels", "Lumber Spent", "Lumber Needed", "Ore Spent", "Ore Needed", "Time Spent"]
+        build_labels = ["Total Levels", "Lumber Spent", "Ore Spent", "Time Spent", "Lumber Needed", "Ore Needed", "Time Needed"]
         for i, l in enumerate(build_labels):
             tk.Label(f_build, text=l+":", bg=self.bg_color, fg=self.fg_color).grid(row=i, column=0, sticky="w", padx=5, pady=2)
             v = tk.StringVar(value="-")
@@ -480,6 +535,18 @@ class DatenVerwaltungApp:
         
         self.lbl_spent_ore = tk.Label(self.spent_frame, text="Ore: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
         self.lbl_spent_ore.pack(side="left", expand=True, pady=5)
+
+        self.needed_frame = tk.LabelFrame(self.tab_build_levels, text="Total Resources Needed", bg=self.bg_color, fg=self.fg_color)
+        self.needed_frame.grid(row=7, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        
+        self.lbl_needed_time = tk.Label(self.needed_frame, text="Time: 0s", bg=self.bg_color, fg=self.fg_color, font=("Arial", 10, "bold"))
+        self.lbl_needed_time.pack(side="left", expand=True, pady=5)
+        
+        self.lbl_needed_lumber = tk.Label(self.needed_frame, text="Lumber: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
+        self.lbl_needed_lumber.pack(side="left", expand=True, pady=5)
+        
+        self.lbl_needed_ore = tk.Label(self.needed_frame, text="Ore: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
+        self.lbl_needed_ore.pack(side="left", expand=True, pady=5)
 
         self.target_cost_frame = tk.LabelFrame(self.tab_build_targets, text="Total Target Cost", bg=self.bg_color, fg=self.fg_color)
         self.target_cost_frame.grid(row=6, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
@@ -964,8 +1031,40 @@ class DatenVerwaltungApp:
         self.setup_team_calculator() 
         self.setup_fashion_ui()
 
-        self.input_frame = tk.LabelFrame(self.tab_hero_datapoints, text="Data Entry", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
-        self.input_frame.pack(fill="x", padx=10, pady=5)
+        self.hero_top_frame = tk.Frame(self.tab_hero_datapoints, bg=self.bg_color)
+        self.hero_top_frame.pack(fill="x", padx=10, pady=5)
+
+        self.hero_left_col = tk.Frame(self.hero_top_frame, bg=self.bg_color)
+        self.hero_left_col.pack(side="left", fill="both", expand=True)
+
+        self.hero_right_col = tk.Frame(self.hero_top_frame, bg=self.bg_color)
+        self.hero_right_col.pack(side="right", fill="y", padx=(10, 0))
+
+        self.dust_inventory_frame = tk.LabelFrame(self.hero_left_col, text="Dust Inventory", padx=10, pady=5, bg=self.bg_color, fg=self.fg_color)
+        self.dust_inventory_frame.pack(fill="x", pady=(0, 5))
+        
+        tk.Label(self.dust_inventory_frame, text="Blue:", bg=self.bg_color, fg="#64b5f6").pack(side="left", padx=5)
+        self.entry_dust_blue = tk.Entry(self.dust_inventory_frame, textvariable=self.dust_blue_var, width=15, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_dust_blue.pack(side="left", padx=5)
+        
+        tk.Label(self.dust_inventory_frame, text="Green:", bg=self.bg_color, fg="#81c784").pack(side="left", padx=5)
+        self.entry_dust_green = tk.Entry(self.dust_inventory_frame, textvariable=self.dust_green_var, width=15, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_dust_green.pack(side="left", padx=5)
+        
+        tk.Label(self.dust_inventory_frame, text="Yellow:", bg=self.bg_color, fg="#fff176").pack(side="left", padx=5)
+        self.entry_dust_yellow = tk.Entry(self.dust_inventory_frame, textvariable=self.dust_yellow_var, width=15, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_dust_yellow.pack(side="left", padx=5)
+        
+        tk.Label(self.dust_inventory_frame, text="Red:", bg=self.bg_color, fg="#e57373").pack(side="left", padx=5)
+        self.entry_dust_red = tk.Entry(self.dust_inventory_frame, textvariable=self.dust_red_var, width=15, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_dust_red.pack(side="left", padx=5)
+
+        for entry in (self.entry_dust_blue, self.entry_dust_green, self.entry_dust_yellow, self.entry_dust_red):
+            entry.bind('<FocusOut>', self.save_dust_inventory)
+            entry.bind('<Return>', self.save_dust_inventory)
+
+        self.input_frame = tk.LabelFrame(self.hero_left_col, text="Data Entry", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
+        self.input_frame.pack(fill="x", pady=5)
 
         self.current_id = None 
 
@@ -985,28 +1084,31 @@ class DatenVerwaltungApp:
         self.entry_sterne.bind('<Return>', self.add_record)
         self.entry_xp.bind('<Return>', self.add_record)
 
-        self.btn_frame = tk.Frame(self.tab_hero_datapoints, bg=self.bg_color)
-        self.btn_frame.pack(pady=10)
+        self.btn_frame = tk.Frame(self.input_frame, bg=self.bg_color)
+        self.btn_frame.grid(row=0, column=6, padx=10)
 
         self.normal_btns = tk.Frame(self.btn_frame, bg=self.bg_color)
         self.normal_btns.pack()
 
         self.btn_add = tk.Button(self.normal_btns, text="Add", command=self.add_record, bg=self.accent_green, fg="white", relief="flat", padx=10)
-        self.btn_add.grid(row=0, column=0, padx=10)
+        self.btn_add.grid(row=0, column=0, padx=5)
 
         self.btn_update = tk.Button(self.normal_btns, text="Update", command=self.update_record, bg=self.accent_yellow, fg="black", relief="flat", padx=10)
-        self.btn_update.grid(row=0, column=1, padx=10)
+        self.btn_update.grid(row=0, column=1, padx=5)
 
         self.btn_delete = tk.Button(self.normal_btns, text="Delete", command=self.ask_delete, bg=self.accent_red, fg="white", relief="flat", padx=10)
-        self.btn_delete.grid(row=0, column=2, padx=10)
+        self.btn_delete.grid(row=0, column=2, padx=5)
 
         self.btn_clear = tk.Button(self.normal_btns, text="Clear Fields", command=self.clear_hero_fields_action, bg=self.btn_bg, fg="white", relief="flat", padx=10)
-        self.btn_clear.grid(row=0, column=3, padx=10)
+        self.btn_clear.grid(row=0, column=3, padx=5)
 
         self.confirm_btns = tk.Frame(self.btn_frame, bg=self.bg_color)
         tk.Label(self.confirm_btns, text="Really delete?", fg="#ff6666", bg=self.bg_color).pack(side="left", padx=5)
         tk.Button(self.confirm_btns, text="Yes", command=self.perform_delete, bg=self.accent_red, fg="white", relief="flat").pack(side="left", padx=5)
         tk.Button(self.confirm_btns, text="No", command=self.cancel_delete, bg=self.btn_bg, fg="white", relief="flat").pack(side="left", padx=5)
+
+        self.hero_stats_frame = tk.LabelFrame(self.hero_right_col, text="Summary Statistics", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
+        self.hero_stats_frame.pack(side="top", fill="both", expand=True)
 
         self.status_label = tk.Label(self.tab_hero_datapoints, text="", font=("Arial", 10), bg=self.bg_color, fg=self.fg_color)
         self.status_label.pack(pady=5)
@@ -1028,35 +1130,22 @@ class DatenVerwaltungApp:
         self.cmb_dust_filter = ttk.Combobox(self.search_frame, textvariable=self.dust_filter_var, values=["All", "Legendary", "Epic", "Rare"], state="readonly", width=10)
         self.cmb_dust_filter.pack(side="left", padx=5)
         self.cmb_dust_filter.bind("<<ComboboxSelected>>", self.load_data)
-
-        self.hero_stats_frame = tk.Frame(self.tab_hero_datapoints, bg=self.bg_color)
-        self.hero_stats_frame.pack(fill="x", padx=10, pady=(0, 5))
         
-        self.hero_stats_frame.grid_columnconfigure(0, minsize=250)
-        self.hero_stats_frame.grid_columnconfigure(1, minsize=100) 
-        self.hero_stats_frame.grid_columnconfigure(2, minsize=100) 
-        self.hero_stats_frame.grid_columnconfigure(3, minsize=100) 
-        self.hero_stats_frame.grid_columnconfigure(4, minsize=250) 
-        self.hero_stats_frame.grid_columnconfigure(5, minsize=100) 
-        self.hero_stats_frame.grid_columnconfigure(6, minsize=100) 
-        self.hero_stats_frame.grid_columnconfigure(7, minsize=150) 
-        self.hero_stats_frame.grid_columnconfigure(8, minsize=150) 
-
-        tk.Label(self.hero_stats_frame, text="", bg=self.bg_color).grid(row=0, column=0) 
-        tk.Label(self.hero_stats_frame, text="", bg=self.bg_color).grid(row=0, column=1)
-        tk.Label(self.hero_stats_frame, text="", bg=self.bg_color).grid(row=0, column=2)
-        self.lbl_hero_total_stars = tk.Label(self.hero_stats_frame, text="Total: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
-        self.lbl_hero_total_stars.grid(row=0, column=3, sticky="w")
-        self.lbl_hero_total_xp = tk.Label(self.hero_stats_frame, text="Total: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
-        self.lbl_hero_total_xp.grid(row=0, column=4, sticky="w")
-        self.lbl_dust_total_used = tk.Label(self.hero_stats_frame, text="Dust Used: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
-        self.lbl_dust_total_used.grid(row=0, column=5, sticky="w")
-        self.lbl_dust_total_needed = tk.Label(self.hero_stats_frame, text="Dust Needed: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
-        self.lbl_dust_total_needed.grid(row=0, column=6, sticky="w")
+        self.lbl_hero_total_stars = tk.Label(self.hero_stats_frame, text="Total Stars: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
+        self.lbl_hero_total_stars.grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        self.lbl_hero_total_xp = tk.Label(self.hero_stats_frame, text="Total XP Levels: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
+        self.lbl_hero_total_xp.grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.lbl_hero_grand_total_xp = tk.Label(self.hero_stats_frame, text="Total XP: 0", bg=self.bg_color, fg="#b0bec5", font=("Arial", 10, "bold"))
-        self.lbl_hero_grand_total_xp.grid(row=0, column=7, sticky="w")
+        self.lbl_hero_grand_total_xp.grid(row=2, column=0, sticky="w", padx=10, pady=5)
         self.lbl_hero_total_xp_needed = tk.Label(self.hero_stats_frame, text="XP Needed: 0", bg=self.bg_color, fg="#ffab91", font=("Arial", 10, "bold"))
-        self.lbl_hero_total_xp_needed.grid(row=0, column=8, sticky="w")
+        self.lbl_hero_total_xp_needed.grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        
+        self.lbl_dust_total_used = tk.Label(self.hero_stats_frame, text="Dust Used: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
+        self.lbl_dust_total_used.grid(row=0, column=1, sticky="w", padx=10, pady=5)
+        self.lbl_dust_total_needed = tk.Label(self.hero_stats_frame, text="Dust Needed: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
+        self.lbl_dust_total_needed.grid(row=1, column=1, sticky="w", padx=10, pady=5)
+        self.lbl_dust_total_saved = tk.Label(self.hero_stats_frame, text="Dust Saved: 0", bg=self.bg_color, fg="#64b5f6", font=("Arial", 10, "bold"))
+        self.lbl_dust_total_saved.grid(row=2, column=1, sticky="w", padx=10, pady=5)
 
         self.tree_frame = tk.Frame(self.tab_hero_datapoints, bg=self.bg_color)
         self.tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -1099,8 +1188,40 @@ class DatenVerwaltungApp:
         # --- Pets Tab UI ---
         self.pet_current_id = None
         
-        self.pet_input_frame = tk.LabelFrame(self.tab_pets, text="Data Entry", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
-        self.pet_input_frame.pack(fill="x", padx=10, pady=5)
+        self.pet_top_frame = tk.Frame(self.tab_pets, bg=self.bg_color)
+        self.pet_top_frame.pack(fill="x", padx=10, pady=5)
+
+        self.pet_left_col = tk.Frame(self.pet_top_frame, bg=self.bg_color)
+        self.pet_left_col.pack(side="left", fill="both", expand=True)
+
+        self.pet_right_col = tk.Frame(self.pet_top_frame, bg=self.bg_color)
+        self.pet_right_col.pack(side="right", fill="y", padx=(10, 0))
+
+        self.feathers_inventory_frame = tk.LabelFrame(self.pet_left_col, text="Feathers Inventory", padx=10, pady=5, bg=self.bg_color, fg=self.fg_color)
+        self.feathers_inventory_frame.pack(fill="x", pady=(0, 5))
+        
+        tk.Label(self.feathers_inventory_frame, text="Blue:", bg=self.bg_color, fg="#64b5f6").pack(side="left", padx=5)
+        self.entry_feathers_blue = tk.Entry(self.feathers_inventory_frame, textvariable=self.feathers_blue_var, width=10, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_feathers_blue.pack(side="left", padx=5)
+        
+        tk.Label(self.feathers_inventory_frame, text="Green:", bg=self.bg_color, fg="#81c784").pack(side="left", padx=5)
+        self.entry_feathers_green = tk.Entry(self.feathers_inventory_frame, textvariable=self.feathers_green_var, width=10, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_feathers_green.pack(side="left", padx=5)
+        
+        tk.Label(self.feathers_inventory_frame, text="Yellow:", bg=self.bg_color, fg="#fff176").pack(side="left", padx=5)
+        self.entry_feathers_yellow = tk.Entry(self.feathers_inventory_frame, textvariable=self.feathers_yellow_var, width=10, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_feathers_yellow.pack(side="left", padx=5)
+        
+        tk.Label(self.feathers_inventory_frame, text="Red:", bg=self.bg_color, fg="#e57373").pack(side="left", padx=5)
+        self.entry_feathers_red = tk.Entry(self.feathers_inventory_frame, textvariable=self.feathers_red_var, width=10, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
+        self.entry_feathers_red.pack(side="left", padx=5)
+
+        for entry in (self.entry_feathers_blue, self.entry_feathers_green, self.entry_feathers_yellow, self.entry_feathers_red):
+            entry.bind('<FocusOut>', self.save_feathers_inventory)
+            entry.bind('<Return>', self.save_feathers_inventory)
+
+        self.pet_input_frame = tk.LabelFrame(self.pet_left_col, text="Data Entry", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
+        self.pet_input_frame.pack(fill="x", pady=(0, 5))
 
         tk.Label(self.pet_input_frame, text="Name:", bg=self.bg_color, fg=self.fg_color).grid(row=0, column=0, sticky="w", padx=5)
         self.entry_pet_name = tk.Entry(self.pet_input_frame, width=25, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
@@ -1118,27 +1239,24 @@ class DatenVerwaltungApp:
         self.entry_pet_sterne.bind('<Return>', self.add_pet_record)
         self.entry_pet_bond.bind('<Return>', self.add_pet_record)
 
-        self.pet_btn_frame = tk.Frame(self.tab_pets, bg=self.bg_color)
-        self.pet_btn_frame.pack(pady=10)
+        self.pet_btn_frame = tk.Frame(self.pet_input_frame, bg=self.bg_color)
+        self.pet_btn_frame.grid(row=0, column=6, padx=10)
 
         self.pet_normal_btns = tk.Frame(self.pet_btn_frame, bg=self.bg_color)
         self.pet_normal_btns.pack()
 
-        tk.Button(self.pet_normal_btns, text="Add", command=self.add_pet_record, bg=self.accent_green, fg="white", relief="flat", padx=10).grid(row=0, column=0, padx=10)
-        tk.Button(self.pet_normal_btns, text="Update", command=self.update_pet_record, bg=self.accent_yellow, fg="black", relief="flat", padx=10).grid(row=0, column=1, padx=10)
-        tk.Button(self.pet_normal_btns, text="Delete", command=self.ask_delete_pet, bg=self.accent_red, fg="white", relief="flat", padx=10).grid(row=0, column=2, padx=10)
-        tk.Button(self.pet_normal_btns, text="Clear Fields", command=self.clear_pet_fields_action, bg=self.btn_bg, fg="white", relief="flat", padx=10).grid(row=0, column=3, padx=10)
+        tk.Button(self.pet_normal_btns, text="Add", command=self.add_pet_record, bg=self.accent_green, fg="white", relief="flat", padx=10).grid(row=0, column=0, padx=5)
+        tk.Button(self.pet_normal_btns, text="Update", command=self.update_pet_record, bg=self.accent_yellow, fg="black", relief="flat", padx=10).grid(row=0, column=1, padx=5)
+        tk.Button(self.pet_normal_btns, text="Delete", command=self.ask_delete_pet, bg=self.accent_red, fg="white", relief="flat", padx=10).grid(row=0, column=2, padx=5)
+        tk.Button(self.pet_normal_btns, text="Clear Fields", command=self.clear_pet_fields_action, bg=self.btn_bg, fg="white", relief="flat", padx=10).grid(row=0, column=3, padx=5)
 
         self.pet_confirm_btns = tk.Frame(self.pet_btn_frame, bg=self.bg_color)
         tk.Label(self.pet_confirm_btns, text="Really delete?", fg="#ff6666", bg=self.bg_color).pack(side="left", padx=5)
         tk.Button(self.pet_confirm_btns, text="Yes", command=self.perform_delete_pet, bg=self.accent_red, fg="white", relief="flat").pack(side="left", padx=5)
         tk.Button(self.pet_confirm_btns, text="No", command=self.cancel_delete_pet, bg=self.btn_bg, fg="white", relief="flat").pack(side="left", padx=5)
 
-        self.pet_status_label = tk.Label(self.tab_pets, text="", font=("Arial", 10), bg=self.bg_color, fg=self.fg_color)
-        self.pet_status_label.pack(pady=5)
-
-        self.pet_search_frame = tk.Frame(self.tab_pets, bg=self.bg_color)
-        self.pet_search_frame.pack(fill="x", padx=10, pady=(0, 5))
+        self.pet_search_frame = tk.Frame(self.pet_left_col, bg=self.bg_color)
+        self.pet_search_frame.pack(fill="x", pady=(5, 0))
         
         tk.Label(self.pet_search_frame, text="Search:", bg=self.bg_color, fg=self.fg_color).pack(side="left")
         self.entry_pet_search = tk.Entry(self.pet_search_frame, width=25, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", relief="flat")
@@ -1150,30 +1268,28 @@ class DatenVerwaltungApp:
         self.chk_hide_pets = tk.Checkbutton(self.pet_search_frame, text="Hide unobtained", variable=self.hide_pets_var, command=self.toggle_hide_pets, bg=self.bg_color, fg=self.fg_color, selectcolor=self.entry_bg, activebackground=self.bg_color, activeforeground=self.fg_color)
         self.chk_hide_pets.pack(side="left", padx=10)
 
-        self.pet_stats_frame = tk.Frame(self.tab_pets, bg=self.bg_color)
-        self.pet_stats_frame.pack(fill="x", padx=10, pady=(0, 5))
-        
-        self.pet_stats_frame.grid_columnconfigure(0, minsize=250)
-        self.pet_stats_frame.grid_columnconfigure(1, minsize=100)
-        self.pet_stats_frame.grid_columnconfigure(2, minsize=250)
-        self.pet_stats_frame.grid_columnconfigure(3, minsize=100)
-        self.pet_stats_frame.grid_columnconfigure(4, minsize=100)
-        self.pet_stats_frame.grid_columnconfigure(5, minsize=100)
-        self.pet_stats_frame.grid_columnconfigure(6, minsize=100)
+        self.pet_stats_frame = tk.LabelFrame(self.pet_right_col, text="Summary Statistics", padx=10, pady=10, bg=self.bg_color, fg=self.fg_color)
+        self.pet_stats_frame.pack(side="top", fill="both", expand=True)
 
-        tk.Label(self.pet_stats_frame, text="", bg=self.bg_color).grid(row=0, column=0)
-        self.lbl_pet_total_stars = tk.Label(self.pet_stats_frame, text="Total: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
-        self.lbl_pet_total_stars.grid(row=0, column=1, sticky="w")
-        self.lbl_pet_total_bond = tk.Label(self.pet_stats_frame, text="Total: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
-        self.lbl_pet_total_bond.grid(row=0, column=2, sticky="w")
-        self.lbl_pet_total_feathers_used = tk.Label(self.pet_stats_frame, text="Used: 0", bg=self.bg_color, fg="#b0bec5", font=("Arial", 10, "bold"))
-        self.lbl_pet_total_feathers_used.grid(row=0, column=3, sticky="w")
-        self.lbl_pet_total_feathers_needed = tk.Label(self.pet_stats_frame, text="Needed: 0", bg=self.bg_color, fg="#ffab91", font=("Arial", 10, "bold"))
-        self.lbl_pet_total_feathers_needed.grid(row=0, column=4, sticky="w")
+        self.lbl_pet_total_stars = tk.Label(self.pet_stats_frame, text="Total Stars: 0", bg=self.bg_color, fg=self.accent_yellow, font=("Arial", 10, "bold"))
+        self.lbl_pet_total_stars.grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        self.lbl_pet_total_bond = tk.Label(self.pet_stats_frame, text="Total Bond Levels: 0", bg=self.bg_color, fg=self.accent_green, font=("Arial", 10, "bold"))
+        self.lbl_pet_total_bond.grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        self.lbl_pet_total_feathers_used = tk.Label(self.pet_stats_frame, text="Feathers Used: 0", bg=self.bg_color, fg="#b0bec5", font=("Arial", 10, "bold"))
+        self.lbl_pet_total_feathers_used.grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        self.lbl_pet_total_feathers_needed = tk.Label(self.pet_stats_frame, text="Feathers Needed: 0", bg=self.bg_color, fg="#ffab91", font=("Arial", 10, "bold"))
+        self.lbl_pet_total_feathers_needed.grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        
+        self.lbl_pet_total_feathers_saved = tk.Label(self.pet_stats_frame, text="Feathers Saved: 0", bg=self.bg_color, fg="#64b5f6", font=("Arial", 10, "bold"))
+        self.lbl_pet_total_feathers_saved.grid(row=4, column=0, sticky="w", padx=10, pady=5)
+
         self.lbl_pet_total_time_spent = tk.Label(self.pet_stats_frame, text="Time Spent: 0s", bg=self.bg_color, fg="#ce93d8", font=("Arial", 10, "bold"))
-        self.lbl_pet_total_time_spent.grid(row=0, column=5, sticky="w")
+        self.lbl_pet_total_time_spent.grid(row=0, column=1, sticky="w", padx=10, pady=5)
         self.lbl_pet_total_time_left = tk.Label(self.pet_stats_frame, text="Time Left: 0s", bg=self.bg_color, fg="#ef9a9a", font=("Arial", 10, "bold"))
-        self.lbl_pet_total_time_left.grid(row=0, column=6, sticky="w")
+        self.lbl_pet_total_time_left.grid(row=1, column=1, sticky="w", padx=10, pady=5)
+
+        self.pet_status_label = tk.Label(self.tab_pets, text="", font=("Arial", 10), bg=self.bg_color, fg=self.fg_color)
+        self.pet_status_label.pack(pady=5)
 
         self.pet_tree_frame = tk.Frame(self.tab_pets, bg=self.bg_color)
         self.pet_tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -1240,7 +1356,7 @@ class DatenVerwaltungApp:
 
         # --- Rules Tab UI ---
         rules_text = """
-# RULES & INFORMATION
+# INFORMATION
 
 ## General Disclamer
 *AI was used to help code this as I don't have enough coding knowledge, especially with databases.*
@@ -1332,6 +1448,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
 
 #### Subtab: Levels
 * View current upgrade costs and the total resources needed to max out each building.
+* Includes summaries for **Total Resources Spent** and **Total Resources Needed** across all buildings.
 * `Max All`: Sets all other buildings to your current Castle level.
 * **Rule**: No building can be a higher level than your Castle.
 
@@ -1362,6 +1479,15 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
     * Shows the current Boost %, the Amber cost for the next level, and the total Amber needed to max out.
     * Use the `+` and `-` buttons to easily adjust levels.
     * `Max All`: Instantly sets all equipment to the maximum level.
+
+### [Seasonal]
+* **Purpose**: Track your resource gains and progress across different game seasons.
+* **Features**:
+    * Track stats like Gold, Elixir, Buildings, Research, Coins, Eggs, Scrolls, Towns Conquered, Amber, Dust, and Feathers.
+    * `Create New Season`: Adds a new column to track data for the next season.
+    * `Edit Season`: Opens a bulk-edit interface to quickly input or update all resource values for the selected season.
+    * `Clear Season`: Wipes all data for the currently selected season.
+    * `Import/Export CSV`: Save or load your seasonal data independently.
 
 ### [Notepad]
 * **Purpose**: A simple space for notes.
@@ -1461,6 +1587,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         self.update_progress_tab()
         self.load_elixir_data()
         self.update_stats_tab()
+        self.load_seasonal_data()
 
     def on_closing(self):
         # Gracefully shut down DB on exit
@@ -1468,11 +1595,25 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             self.conn.close()
         self.root.destroy()
 
+    def navigate_to_tab(self, main_tab, sub_nb=None, sub_tab=None):
+        if main_tab:
+            self.notebook.select(main_tab)
+        if sub_nb and sub_tab:
+            sub_nb.select(sub_tab)
+
     def render_markdown(self, text):
         lines = text.split('\n')
+        current_main_tab = None
+        tag_counter = 0
+        
         for line in lines:
             tags = ["normal"]
             
+            is_link = False
+            main_target = None
+            sub_nb_target = None
+            sub_target = None
+
             if line.startswith("# "):
                 tags = ["h1"]
                 line = line[2:]
@@ -1480,11 +1621,54 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
                 tags = ["h2"]
                 line = line[3:]
             elif line.startswith("#### "):
-                tags = ["h4"]
+                tags = ["h4", "underline"]
                 line = line[5:]
+                
+                subtab_name = line.replace("Subtab:", "").strip().lower()
+                
+                if current_main_tab == self.tab_hero:
+                    sub_nb_target = self.hero_notebook
+                    if "datapoints" in subtab_name: sub_target = self.tab_hero_datapoints
+                    elif "team calc" in subtab_name: sub_target = self.tab_hero_team_calc
+                    elif "fashion" in subtab_name: sub_target = self.tab_hero_fashion
+                elif current_main_tab == self.tab_pulls:
+                    sub_nb_target = self.pulls_notebook
+                    if "main" in subtab_name: sub_target = self.tab_pulls_main
+                    elif "luck" in subtab_name: sub_target = self.tab_pulls_luck
+                    elif "datapoints" in subtab_name: sub_target = self.tab_pulls_dp_scrolls
+                elif current_main_tab == self.tab_buildings:
+                    sub_nb_target = self.buildings_notebook
+                    if "levels" in subtab_name: sub_target = self.tab_build_levels
+                    elif "targets" in subtab_name: sub_target = self.tab_build_targets
+                elif current_main_tab == self.tab_elixir:
+                    sub_nb_target = self.elixir_notebook
+                    if "expected" in subtab_name: sub_target = self.tab_elixir_expected
+                    elif "datapoint" in subtab_name: sub_target = self.tab_elixir_datapoints
+                    elif "graph" in subtab_name: sub_target = self.tab_elixir_graph
+                
+                if sub_target:
+                    is_link = True
+                    main_target = current_main_tab
             elif line.startswith("### "):
                 tags = ["h3"]
                 line = line[4:]
+                
+                tab_name = line.replace("[", "").replace("]", "").strip().lower()
+                if "progress" in tab_name: current_main_tab = self.tab_progress
+                elif "stats" in tab_name: current_main_tab = self.tab_stats
+                elif "heroes" in tab_name: current_main_tab = self.tab_hero
+                elif "pets" in tab_name: current_main_tab = self.tab_pets
+                elif "pulls" in tab_name: current_main_tab = self.tab_pulls
+                elif "conquest" in tab_name: current_main_tab = self.tab_buildings
+                elif "elixir" in tab_name: current_main_tab = self.tab_elixir
+                elif "equipment" in tab_name: current_main_tab = self.tab_equipment
+                elif "seasonal" in tab_name: current_main_tab = self.tab_seasonal
+                elif "notepad" in tab_name: current_main_tab = self.tab_notepad
+                elif "settings" in tab_name: current_main_tab = self.tab_settings
+                
+                if current_main_tab:
+                    is_link = True
+                    main_target = current_main_tab
             elif line.strip() == "---":
                 self.txt_rules.insert("end", "-"*100 + "\n", "normal")
                 continue
@@ -1495,20 +1679,37 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
                 tags.append("bullet_1" if indent > 0 else "bullet_0")
                 line = "• " + stripped[2:]
             
+            link_tag = None
+            if is_link:
+                tag_counter += 1
+                link_tag = f"header_link_{tag_counter}"
+                tags.append(link_tag)
+
             parts = re.split(r'(\*\*.*?\*\*|`.*?`|\*.*?\*|__.*?__|~~.*?~~)', line)
             for part in parts:
+                if not part: continue
+                current_tags = list(tags)
                 if part.startswith("**") and part.endswith("**"):
-                    self.txt_rules.insert("end", part[2:-2], tuple(tags + ["bold"]))
+                    current_tags.append("bold")
+                    part = part[2:-2]
                 elif part.startswith("`") and part.endswith("`"):
-                    self.txt_rules.insert("end", part[1:-1], tuple(tags + ["code"]))
+                    current_tags.append("code")
+                    part = part[1:-1]
                 elif part.startswith("*") and part.endswith("*"):
-                    self.txt_rules.insert("end", part[1:-1], tuple(tags + ["italic"]))
+                    current_tags.append("italic")
+                    part = part[1:-1]
                 elif part.startswith("__") and part.endswith("__"):
-                    self.txt_rules.insert("end", part[2:-2], tuple(tags + ["underline"]))
+                    current_tags.append("underline")
+                    part = part[2:-2]
                 elif part.startswith("~~") and part.endswith("~~"):
-                    self.txt_rules.insert("end", part[2:-2], tuple(tags + ["strike"]))
-                else:
-                    self.txt_rules.insert("end", part, tuple(tags))
+                    current_tags.append("strike")
+                    part = part[2:-2]
+                self.txt_rules.insert("end", part, tuple(current_tags))
+            
+            if is_link:
+                self.txt_rules.tag_bind(link_tag, "<Button-1>", lambda e, m=main_target, sn=sub_nb_target, s=sub_target: self.navigate_to_tab(m, sn, s))
+                self.txt_rules.tag_bind(link_tag, "<Enter>", lambda e: self.txt_rules.config(cursor="hand2"))
+                self.txt_rules.tag_bind(link_tag, "<Leave>", lambda e: self.txt_rules.config(cursor=""))
             
             self.txt_rules.insert("end", "\n")
 
@@ -2152,7 +2353,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         c.execute("SELECT sterne, bond_level FROM pets")
         rows = c.fetchall()
         
-        p_obtained, p_stars, p_bond, p_feathers_used, p_feathers_needed, p_time = 0, 0, 0, 0, 0, 0
+        p_obtained, p_stars, p_bond, p_feathers_used, p_feathers_needed, p_time, p_time_needed = 0, 0, 0, 0, 0, 0, 0
         
         for r in rows:
             s = int(r[0]) if r[0] != '-' else 0
@@ -2161,7 +2362,10 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             
             b = int(r[1]) if r[1] != '-' else 0
             p_bond += b
-            if b > 0: p_time += self.pet_bond_time_cumulative[max(0, b - 1)]
+            
+            limit_idx = max(0, b - 1)
+            p_time += self.pet_bond_time_cumulative[limit_idx]
+            p_time_needed += (self.pet_bond_time_cumulative[-1] - self.pet_bond_time_cumulative[limit_idx])
             
             s_clamped = max(0, min(s, 12))
             p_feathers_used += self.pet_feather_cumulative[s_clamped]
@@ -2173,11 +2377,12 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         self.stats_vars["pet_3"].set(f"{p_feathers_used:,}")
         self.stats_vars["pet_4"].set(f"{p_feathers_needed:,}")
         self.stats_vars["pet_5"].set(self.format_seconds(p_time))
+        self.stats_vars["pet_6"].set(self.format_seconds(p_time_needed))
 
         c.execute("SELECT name, level FROM buildings")
         rows = c.fetchall()
         
-        b_levels, b_lumber, b_lumber_needed, b_ore, b_ore_needed, b_time = 0, 0, 0, 0, 0, 0
+        b_levels, b_lumber, b_lumber_needed, b_ore, b_ore_needed, b_time, b_time_needed = 0, 0, 0, 0, 0, 0, 0
         
         try:
             mul_speed, mul_lumber, mul_ore = float(self.const_speed_var.get())/100, float(self.const_lumber_var.get())/100, float(self.const_ore_var.get())/100
@@ -2196,10 +2401,12 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
                 if i < lvl:
                     b_time += time; b_lumber += lumber; b_ore += ore
                 if i >= lvl and i < self.building_max_level:
-                    b_lumber_needed += lumber; b_ore_needed += ore
+                    b_time_needed += time; b_lumber_needed += lumber; b_ore_needed += ore
         
-        self.stats_vars["build_0"].set(f"{b_levels}"); self.stats_vars["build_1"].set(f"{b_lumber:,}"); self.stats_vars["build_2"].set(f"{b_lumber_needed:,}")
-        self.stats_vars["build_3"].set(f"{b_ore:,}"); self.stats_vars["build_4"].set(f"{b_ore_needed:,}"); self.stats_vars["build_5"].set(self.format_seconds(b_time))
+        self.stats_vars["build_0"].set(f"{b_levels}"); self.stats_vars["build_1"].set(f"{b_lumber:,}"); self.stats_vars["build_2"].set(f"{b_ore:,}")
+        self.stats_vars["build_3"].set(self.format_seconds(b_time)); self.stats_vars["build_4"].set(f"{b_lumber_needed:,}")
+        self.stats_vars["build_5"].set(f"{b_ore_needed:,}")
+        self.stats_vars["build_6"].set(self.format_seconds(b_time_needed))
 
         c.execute("SELECT date, total_elixir FROM elixir_data ORDER BY date ASC")
         rows = c.fetchall()
@@ -2236,6 +2443,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             c.execute("CREATE TABLE IF NOT EXISTS pulls_eggs (id INTEGER PRIMARY KEY, name TEXT, stars INTEGER, date TEXT)")
             c.execute("CREATE TABLE IF NOT EXISTS equipment (name TEXT PRIMARY KEY, level INTEGER)")
             c.execute("CREATE TABLE IF NOT EXISTS fashion (name TEXT PRIMARY KEY, is_unlocked INTEGER)")
+            c.execute("CREATE TABLE IF NOT EXISTS seasonal_data (resource TEXT PRIMARY KEY)")
 
             def add_column(table, column, type, default="'-'"):
                 c.execute(f"PRAGMA table_info({table})")
@@ -2272,6 +2480,11 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             
             for item in self.fashion_items:
                 c.execute("INSERT OR IGNORE INTO fashion (name, is_unlocked) VALUES (?, ?)", (item, 1 if item == "Default" else 0))
+
+            # --- Initialize Seasonal Data ---
+            seasonal_resources = ["Gold", "Elixir", "Buildings", "Research", "Coins", "Eggs", "Rare Scrolls", "Epic Scrolls", "Towns Conquered", "Amber", "Dust", "Feathers"]
+            for resource in seasonal_resources:
+                c.execute("INSERT OR IGNORE INTO seasonal_data (resource) VALUES (?)", (resource,))
 
     def load_saved_equipment_levels(self):
         c = self.conn.cursor()
@@ -2378,6 +2591,13 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             total_dust_needed += dust_needed_val
             
             self.tree.insert("", "end", values=(id, name, faction, class_, s_str, xp_str, f"{dust_used_val:,}", f"{dust_needed_val:,}", f"{current_xp_cost:,}", next_xp_cost))
+
+        total_dust_saved = 0
+        for var in (self.dust_blue_var, self.dust_green_var, self.dust_yellow_var, self.dust_red_var):
+            try:
+                total_dust_saved += int(var.get().replace(',', ''))
+            except ValueError:
+                pass
         
         self.lbl_hero_total_stars.config(text=f"Total Stars: {total_stars}")
         self.lbl_hero_total_xp.config(text=f"Total XP Levels: {total_xp}")
@@ -2385,6 +2605,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         self.lbl_hero_total_xp_needed.config(text=f"XP Needed: {total_xp_needed:,}")
         self.lbl_dust_total_used.config(text=f"Dust Used: {total_dust_used:,}")
         self.lbl_dust_total_needed.config(text=f"Dust Needed: {total_dust_needed:,}")
+        self.lbl_dust_total_saved.config(text=f"Dust Saved: {total_dust_saved:,}")
 
         self.tree.configure(displaycolumns=("Name", "Faction", "Class", "Sterne", "Xp level", "Dust Used", "Dust Needed", "Total XP", "Next XP Cost"))
 
@@ -2601,10 +2822,18 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
                 continue
             self.tree_pets.insert("", "end", values=(row[0], row[1], row[2], row[3], f_used, f_needed, t_spent, t_needed))
         
+        total_feathers_saved = 0
+        for var in (self.feathers_blue_var, self.feathers_green_var, self.feathers_yellow_var, self.feathers_red_var):
+            try:
+                total_feathers_saved += int(var.get().replace(',', ''))
+            except ValueError:
+                pass
+
         self.lbl_pet_total_stars.config(text=f"Total Stars: {total_stars}")
-        self.lbl_pet_total_bond.config(text=f"Total Bond Level: {total_bond}")
-        self.lbl_pet_total_feathers_used.config(text=f"Used: {total_feathers_used:,}")
-        self.lbl_pet_total_feathers_needed.config(text=f"Needed: {total_feathers_needed:,}")
+        self.lbl_pet_total_bond.config(text=f"Total Bond Levels: {total_bond}")
+        self.lbl_pet_total_feathers_used.config(text=f"Feathers Used: {total_feathers_used:,}")
+        self.lbl_pet_total_feathers_needed.config(text=f"Feathers Needed: {total_feathers_needed:,}")
+        self.lbl_pet_total_feathers_saved.config(text=f"Feathers Saved: {total_feathers_saved:,}")
         self.lbl_pet_total_time_spent.config(text=f"Time Spent: {self.format_seconds(total_time_spent)}")
         self.lbl_pet_total_time_left.config(text=f"Time Left: {self.format_seconds(total_time_needed)}")
 
@@ -4026,11 +4255,67 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         self.update_total_spent_summary()
         self.update_total_target_summary()
         self.update_global_data()
+        
+    def save_dust_inventory(self, event=None):
+        vars_map = {
+            'dust_blue': self.dust_blue_var,
+            'dust_green': self.dust_green_var,
+            'dust_yellow': self.dust_yellow_var,
+            'dust_red': self.dust_red_var
+        }
+
+        total_dust_saved = 0
+        for key, var in vars_map.items():
+            val = var.get().strip()
+            try:
+                f_val = int(val.replace(',', ''))
+                final_val = str(f_val)
+            except ValueError:
+                final_val = "0"
+                f_val = 0
+            
+            total_dust_saved += f_val
+            
+            if val != final_val:
+                var.set(final_val)
+            self.run_query("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, final_val))
+            
+        if hasattr(self, 'lbl_dust_total_saved') and self.lbl_dust_total_saved.winfo_exists():
+            self.lbl_dust_total_saved.config(text=f"Dust Saved: {total_dust_saved:,}")
+        self.show_status("Dust inventory saved.", "#66bb6a")
+
+    def save_feathers_inventory(self, event=None):
+        vars_map = {
+            'feathers_blue': self.feathers_blue_var,
+            'feathers_green': self.feathers_green_var,
+            'feathers_yellow': self.feathers_yellow_var,
+            'feathers_red': self.feathers_red_var
+        }
+
+        total_feathers_saved = 0
+        for key, var in vars_map.items():
+            val = var.get().strip()
+            try:
+                f_val = int(val.replace(',', ''))
+                final_val = str(f_val)
+            except ValueError:
+                final_val = "0"
+                f_val = 0
+            
+            total_feathers_saved += f_val
+            
+            if val != final_val:
+                var.set(final_val)
+            self.run_query("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, final_val))
+            
+        if hasattr(self, 'lbl_pet_total_feathers_saved') and self.lbl_pet_total_feathers_saved.winfo_exists():
+            self.lbl_pet_total_feathers_saved.config(text=f"Feathers Saved: {total_feathers_saved:,}")
+        self.show_pet_status("Feathers inventory saved.", "#66bb6a")
 
     def insert_checklist(self):
         self.txt_notepad.insert("insert", "☐ ")
         self.txt_notepad.focus_set()
-
+        
     def on_notepad_click(self, event):
         index = self.txt_notepad.index(f"@{event.x},{event.y}")
         char = self.txt_notepad.get(index)
@@ -4152,6 +4437,10 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         total_time = 0
         total_lumber = 0
         total_ore = 0
+        
+        needed_time = 0
+        needed_lumber = 0
+        needed_ore = 0
 
         try:
             mul_speed = float(self.const_speed_var.get()) / 100.0
@@ -4162,24 +4451,41 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
 
         for name, entry in self.building_entries.items():
             val = entry.get().strip()
-            if val == "" or val == "-": continue
-            try: level = int(val)
-            except ValueError: continue
+            level = 0
+            if val != "" and val != "-":
+                try: level = int(val)
+                except ValueError: pass
             
             costs = []
             if name == "Castle": costs = self.castle_costs
             elif name in ["Ore Mine 1", "Ore Mine 2"]: costs = self.ore_mine_costs
             else: costs = self.other_building_costs
             
-            for i in range(min(level, len(costs))):
+            for i in range(len(costs)):
+                if i >= self.building_max_level:
+                    break
                 c = costs[i]
-                total_time += c[0] * mul_speed
-                total_lumber += math.ceil(c[1] * mul_lumber)
-                total_ore += math.ceil(c[2] * mul_ore)
+                t = c[0] * mul_speed
+                l = math.ceil(c[1] * mul_lumber)
+                o = math.ceil(c[2] * mul_ore)
+                
+                if i < level:
+                    total_time += t
+                    total_lumber += l
+                    total_ore += o
+                else:
+                    needed_time += t
+                    needed_lumber += l
+                    needed_ore += o
 
         self.lbl_spent_time.config(text=f"Time: {self.format_seconds(total_time)}")
         self.lbl_spent_lumber.config(text=f"Lumber: {total_lumber:,}")
         self.lbl_spent_ore.config(text=f"Ore: {total_ore:,}")
+        
+        if hasattr(self, 'lbl_needed_time') and self.lbl_needed_time.winfo_exists():
+            self.lbl_needed_time.config(text=f"Time: {self.format_seconds(needed_time)}")
+            self.lbl_needed_lumber.config(text=f"Lumber: {needed_lumber:,}")
+            self.lbl_needed_ore.config(text=f"Ore: {needed_ore:,}")
 
     def update_total_target_summary(self):
         total_time = 0
@@ -4337,7 +4643,8 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             c = self.conn.cursor()
             with open(file_path, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-                writer.writerow(["Type", "Name/Key", "Val1", "Val2", "Val3", "Val4", "Val5"])
+                # Extend header for seasonal data
+                writer.writerow(["Type", "Name/Key", "Val1", "Val2", "Val3", "Val4", "Val5", "Val6", "Val7"])
                 
                 c.execute("SELECT name, sterne, xp_level, dust_used, dust_needed, rarity FROM daten")
                 for row in c.fetchall():
@@ -4362,7 +4669,12 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
                 c.execute("SELECT date, total_elixir FROM elixir_data ORDER BY date ASC")
                 for row in c.fetchall():
                     writer.writerow(["ELIXIR", row[0], row[1], "", "", "", ""])
-            
+
+                # Add seasonal data to export
+                c.execute("SELECT resource, season_1, season_2, season_3, season_4, season_5, season_6, season_7 FROM seasonal_data ORDER BY resource ASC")
+                for row in c.fetchall():
+                    writer.writerow(["SEASONAL", *row])
+
             self.show_settings_status("Data exported successfully!", "#66bb6a")
         except Exception as e:
             self.show_settings_status(f"Export failed: {e}", "#ef5350")
@@ -4372,50 +4684,60 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
         if not file_path: return
             
         try:
-            c = self.conn.cursor()
-            with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader, None) 
-                
-                for row in reader:
-                    if not row: continue
-                    type_ = row[0]
+            with self.conn: # Use a transaction
+                c = self.conn.cursor()
+                with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+                    reader = csv.reader(file)
+                    next(reader, None) # Skip header
                     
-                    if type_ == "HERO":
-                        if len(row) >= 7:
-                            c.execute("UPDATE daten SET sterne=?, xp_level=?, dust_used=?, dust_needed=?, rarity=? WHERE name=?", 
-                                      (row[2], row[3], row[4], row[5], row[6], row[1]))
-                    elif type_ == "PET":
-                        if len(row) >= 6:
-                            c.execute("UPDATE pets SET sterne=?, bond_level=?, feathers_used=?, feathers_needed=? WHERE name=?", 
-                                      (row[2], row[3], row[4], row[5], row[1]))
-                        elif len(row) >= 4:
-                            c.execute("UPDATE pets SET sterne=?, bond_level=? WHERE name=?", 
-                                      (row[2], row[3], row[1]))
-                    elif type_ == "BUILDING":
-                        if len(row) >= 3:
-                            c.execute("UPDATE buildings SET level=? WHERE name=?", 
-                                      (row[2], row[1]))
-                    elif type_ == "EQUIPMENT":
-                        if len(row) >= 3:
-                            c.execute("UPDATE equipment SET level=? WHERE name=?", 
-                                      (row[2], row[1]))
-                    elif type_ == "SETTING":
-                        if len(row) >= 3:
-                            c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", 
-                                      (row[1], row[2]))
-                    elif type_ == "ELIXIR":
-                        if len(row) >= 3:
-                            date_val = row[1]
-                            elixir_val = row[2]
-                            c.execute("SELECT id FROM elixir_data WHERE date = ?", (date_val,))
-                            existing = c.fetchone()
-                            if existing:
-                                c.execute("UPDATE elixir_data SET total_elixir=? WHERE id=?", (elixir_val, existing[0]))
-                            else:
-                                c.execute("INSERT INTO elixir_data (date, total_elixir) VALUES (?, ?)", (date_val, elixir_val))
+                    for row in reader:
+                        if not row: continue
+                        type_ = row[0]
+                        
+                        if type_ == "HERO":
+                            if len(row) >= 7:
+                                c.execute("UPDATE daten SET sterne=?, xp_level=?, dust_used=?, dust_needed=?, rarity=? WHERE name=?", 
+                                          (row[2], row[3], row[4], row[5], row[6], row[1]))
+                        elif type_ == "PET":
+                            if len(row) >= 6:
+                                c.execute("UPDATE pets SET sterne=?, bond_level=?, feathers_used=?, feathers_needed=? WHERE name=?", 
+                                          (row[2], row[3], row[4], row[5], row[1]))
+                            elif len(row) >= 4:
+                                c.execute("UPDATE pets SET sterne=?, bond_level=? WHERE name=?", 
+                                          (row[2], row[3], row[1]))
+                        elif type_ == "BUILDING":
+                            if len(row) >= 3:
+                                c.execute("UPDATE buildings SET level=? WHERE name=?", 
+                                          (row[2], row[1]))
+                        elif type_ == "EQUIPMENT":
+                            if len(row) >= 3:
+                                c.execute("UPDATE equipment SET level=? WHERE name=?", 
+                                          (row[2], row[1]))
+                        elif type_ == "SETTING":
+                            if len(row) >= 3:
+                                c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", 
+                                          (row[1], row[2]))
+                        elif type_ == "ELIXIR":
+                            if len(row) >= 3:
+                                date_val = row[1]
+                                elixir_val = row[2]
+                                c.execute("SELECT id FROM elixir_data WHERE date = ?", (date_val,))
+                                existing = c.fetchone()
+                                if existing:
+                                    c.execute("UPDATE elixir_data SET total_elixir=? WHERE id=?", (elixir_val, existing[0]))
+                                else:
+                                    c.execute("INSERT INTO elixir_data (date, total_elixir) VALUES (?, ?)", (date_val, elixir_val))
+                        elif type_ == "SEASONAL":
+                            if len(row) >= 9: # Type, Name/Key, 7 season values
+                                resource = row[1]
+                                values = row[2:9]
+                                c.execute("""
+                                    UPDATE seasonal_data 
+                                    SET season_1=?, season_2=?, season_3=?, season_4=?, season_5=?, season_6=?, season_7=?
+                                    WHERE resource=?
+                                """, (*values, resource))
             
-            self.conn.commit()
+            # self.conn.commit() is handled by with self.conn:
             
             self.load_data()
             self.load_pets_data()
@@ -4423,6 +4745,7 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             self.load_elixir_data()
             self.load_saved_equipment_levels()
             self.load_equipment_data()
+            self.load_seasonal_data() # Reload seasonal data
             
             c.execute("SELECT name, level FROM buildings")
             for r in c.fetchall():
@@ -4469,6 +4792,251 @@ This was made by **@i.eatchildren** on discord if you find any issues or want so
             self.show_settings_status("All progress has been reset.", "#66bb6a")
         except Exception as e:
             self.show_settings_status(f"Reset failed: {e}", "#ef5350")
+
+
+    def load_seasonal_data(self):
+        """Clears and reloads the seasonal data treeview, dynamically showing only columns with data."""
+        for row in self.tree_seasonal.get_children():
+            self.tree_seasonal.delete(row)
+
+        try:
+            c = self.conn.cursor()
+            c.execute("SELECT * FROM seasonal_data")
+            rows = c.fetchall()
+            
+            if not rows: return
+
+            # Determine which season columns have actual data
+            visible_columns = ["Resource"]
+            column_data = list(zip(*rows)) # Transpose rows to columns
+            for i in range(1, 8):
+                # Check if any value in the column is not '-'
+                if any(val != '-' for val in column_data[i]):
+                    visible_columns.append(f"Season {i}")
+
+            self.tree_seasonal["columns"] = visible_columns
+            self.tree_seasonal["displaycolumns"] = visible_columns
+
+            for col_name in visible_columns:
+                self.tree_seasonal.heading(col_name, text=col_name)
+                self.tree_seasonal.column(col_name, width=150, anchor="center")
+
+            # Populate with data, filtering to only visible columns
+            for row in rows:
+                row_dict = {f"Season {i+1}": row[i+1] for i in range(7)}
+                row_dict["Resource"] = row[0]
+                
+                visible_values = [row_dict[col] for col in visible_columns]
+                self.tree_seasonal.insert("", "end", values=visible_values)
+
+        except sqlite3.Error as e:
+            self.show_seasonal_status(f"Error loading data: {e}", self.accent_red)
+
+    def _create_seasonal_edit_ui(self):
+        """Dynamically creates a bulk editing UI for a selected season."""
+        season = self.seasonal_season_var.get()
+        if not season:
+            self.show_seasonal_status("Please select a season to edit.", self.accent_yellow)
+            return
+
+        # Clear previous widgets
+        for widget in self.seasonal_bulk_edit_frame.winfo_children():
+            widget.destroy()
+        self.seasonal_entry_widgets.clear()
+
+        edit_frame = tk.LabelFrame(self.seasonal_bulk_edit_frame, text=f"Editing Season {season}", bg=self.bg_color, fg=self.fg_color, padx=10, pady=10)
+        edit_frame.pack(fill="x", expand=True)
+
+        c = self.conn.cursor()
+        c.execute(f"SELECT resource, season_{season} FROM seasonal_data ORDER BY resource ASC")
+        current_data = dict(c.fetchall())
+
+        num_columns = 4
+        for i, resource in enumerate(self.seasonal_resources):
+            row, col = divmod(i, num_columns)
+            
+            container = tk.Frame(edit_frame, bg=self.bg_color)
+            container.grid(row=row, column=col*2, columnspan=2, sticky='w', padx=10, pady=2)
+
+            tk.Label(container, text=f"{resource}:", bg=self.bg_color, fg=self.fg_color, width=15, anchor='w').pack(side="left")
+            entry = tk.Entry(container, bg=self.entry_bg, fg=self.fg_color, insertbackground="white", width=20)
+            entry.pack(side="left")
+            
+            current_val = current_data.get(resource, "-")
+            if current_val != "-":
+                entry.insert(0, current_val)
+            
+            self.seasonal_entry_widgets[resource] = entry
+        
+        save_btn = tk.Button(edit_frame, text=f"Save Changes for Season {season}", 
+                             command=self._save_seasonal_bulk_data, 
+                             bg=self.accent_green, fg="white", relief="flat")
+        save_btn.grid(row=(len(self.seasonal_resources) // num_columns) + 1, column=0, columnspan=num_columns*2, pady=10)
+
+    def _save_seasonal_bulk_data(self):
+        """Saves all data from the bulk edit UI for the currently selected season."""
+        season = self.seasonal_season_var.get()
+        if not season:
+            self.show_seasonal_status("No season selected to save.", self.accent_red)
+            return
+
+        try:
+            with self.conn:
+                c = self.conn.cursor()
+                for resource, entry_widget in self.seasonal_entry_widgets.items():
+                    value = entry_widget.get().strip()
+                    if not value:
+                        value = "-"
+                    else:
+                        # Validate
+                        float(value)
+                    
+                    query = f"UPDATE seasonal_data SET season_{season} = ? WHERE resource = ?"
+                    c.execute(query, (value, resource))
+            
+            self.load_seasonal_data()
+            self.show_seasonal_status(f"Season {season} data updated successfully!", self.accent_green)
+            
+            # Clear the edit frame
+            for widget in self.seasonal_bulk_edit_frame.winfo_children():
+                widget.destroy()
+            self.seasonal_entry_widgets.clear()
+
+        except ValueError:
+            self.show_seasonal_status("Invalid number format detected. Please correct and save again.", self.accent_red)
+        except sqlite3.Error as e:
+            self.show_seasonal_status(f"Database error: {e}", self.accent_red)
+
+    def clear_season_data(self):
+        """Clears all data for the selected season."""
+        season = self.seasonal_season_var.get()
+        if not season:
+            self.show_seasonal_status("Please select a season to clear.", self.accent_yellow)
+            return
+
+        if not messagebox.askyesno("Confirm Clear", f"Are you sure you want to delete all data for Season {season}?"):
+            return
+
+        try:
+            query = f"UPDATE seasonal_data SET season_{season} = '-'"
+            self.run_query(query)
+            self.load_seasonal_data()
+            self.show_seasonal_status(f"Season {season} data has been cleared.", self.accent_green)
+        except sqlite3.Error as e:
+            self.show_seasonal_status(f"Error clearing season: {e}", self.accent_red)
+
+    def export_seasonal_csv(self):
+        """Exports the seasonal data to a CSV file."""
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if not file_path: return
+
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                c = self.conn.cursor()
+                c.execute("PRAGMA table_info(seasonal_data)")
+                headers = [info[1] for info in c.fetchall()]
+                writer.writerow(headers)
+                
+                c.execute("SELECT * FROM seasonal_data ORDER BY resource ASC")
+                writer.writerows(c.fetchall())
+            self.show_seasonal_status("Seasonal data exported successfully!", self.accent_green)
+        except Exception as e:
+            self.show_seasonal_status(f"Export failed: {e}", self.accent_red)
+
+    def import_seasonal_csv(self):
+        """Imports seasonal data from a CSV file."""
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if not file_path: return
+
+        try:
+            with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+                reader = csv.reader(file)
+                headers = next(reader)
+                
+                # Sanitize headers
+                headers = [h.strip() for h in headers]
+                if not headers or headers[0].lower() != 'resource':
+                    raise ValueError("CSV must have 'resource' as the first column.")
+
+                with self.conn:
+                    c = self.conn.cursor()
+                    c.execute("PRAGMA table_info(seasonal_data)")
+                    existing_cols = [info[1] for info in c.fetchall()]
+                    
+                    for row in reader:
+                        if not row: continue
+                        row_dict = dict(zip(headers, row))
+                        resource = row_dict.pop('resource', None)
+                        if not resource: continue
+
+                        for season_col, value in row_dict.items():
+                            # Find season number from column name like 'season_1'
+                            if season_col.startswith('season_'):
+                                if season_col not in existing_cols:
+                                    self._ensure_season_column_exists(season_col)
+                                    existing_cols.append(season_col)
+                                value_to_insert = value.strip() if value.strip() else "-"
+                                query = f"UPDATE seasonal_data SET {season_col} = ? WHERE resource = ?"
+                                self.conn.execute(query, (value_to_insert, resource))
+
+            self.load_seasonal_data()
+            self.show_seasonal_status("Import successful!", self.accent_green)
+        except Exception as e:
+            self.show_seasonal_status(f"Import failed: {e}", self.accent_red)
+
+    def show_seasonal_status(self, message, color):
+        """Shows a status message on the seasonal tab for a few seconds."""
+        self.seasonal_status_label.config(text=message, fg=color)
+        self.root.after(4000, lambda: self.seasonal_status_label.config(text=""))
+
+    def _get_existing_seasons(self):
+        """Returns a sorted list of existing season numbers from the database schema."""
+        c = self.conn.cursor()
+        c.execute("PRAGMA table_info(seasonal_data)")
+        columns = [info[1] for info in c.fetchall()]
+        season_nums = []
+        for col in columns:
+            if col.startswith("season_"):
+                try:
+                    season_nums.append(int(col.split('_')[1]))
+                except (ValueError, IndexError):
+                    continue
+        return sorted(season_nums)
+
+    def _update_season_selector(self):
+        """Updates the season combobox with existing seasons."""
+        seasons = self._get_existing_seasons()
+        self.cmb_seasonal_season['values'] = seasons
+        if seasons:
+            self.seasonal_season_var.set(seasons[-1])
+        else:
+            self.seasonal_season_var.set('')
+
+    def create_new_season(self):
+        """Creates a new, incremental season column in the database."""
+        existing_seasons = self._get_existing_seasons()
+        next_season_num = max(existing_seasons) + 1 if existing_seasons else 1
+        new_column_name = f"season_{next_season_num}"
+
+        try:
+            c = self.conn.cursor()
+            c.execute(f"ALTER TABLE seasonal_data ADD COLUMN {new_column_name} TEXT DEFAULT '-'")
+            self.conn.commit()
+            self.show_seasonal_status(f"Season {next_season_num} created successfully!", self.accent_green)
+            self._update_season_selector()
+            self.load_seasonal_data()
+        except sqlite3.Error as e:
+            self.show_seasonal_status(f"Error creating season: {e}", self.accent_red)
+
+    def _ensure_season_column_exists(self, season_col_name):
+        """Checks if a season column exists and creates it if not."""
+        c = self.conn.cursor()
+        c.execute("PRAGMA table_info(seasonal_data)")
+        existing_cols = [info[1] for info in c.fetchall()]
+        if season_col_name not in existing_cols:
+            c.execute(f"ALTER TABLE seasonal_data ADD COLUMN {season_col_name} TEXT DEFAULT '-'")
+            self.conn.commit()
 
 if __name__ == "__main__":
     root = tk.Tk()
