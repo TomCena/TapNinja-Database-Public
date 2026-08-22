@@ -20,7 +20,7 @@ If you've been using the [Tap Ninja Calculator Website](https://a11v1r15.github.
 # GAME INFO & DOCUMENTATION
 
 ### General Disclaimer
-### AI was used to help code this as I don't have enough coding knowledge, especially with databases. Base code was written by me but optimized with AI so it'll run on anything less than a NASA PC. This Information tab tells you most if not all important information about what this program does. This was made by @i.eatchildren on discord if you find any issues or want something added, please DM me.
+### AI was used to help code this as I don't have enough coding knowledge, especially with databases. This Information tab tells you most if not all important information about what this program does. This was made by @i.eatchildren on discord if you find any issues or want something added, please DM me.
 ---
 
 ## Core Architecture & Features
